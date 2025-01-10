@@ -3,60 +3,188 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EYMSA Equipos</title>
-    <script defer src="app.js"></script>
+    <title>Gestión de Equipos</title>
     <link
       href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
       rel="stylesheet"
     />
+    <script>
+      // Variables globales
+      let equipos = [];
+
+      // Convertir archivos a Base64
+      function convertirArchivoABase64(archivo) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = (error) => reject(error);
+          reader.readAsDataURL(archivo);
+        });
+      }
+
+      // Cargar equipos desde localStorage al iniciar
+      window.onload = function () {
+        const equiposGuardados = localStorage.getItem("equipos");
+        if (equiposGuardados) {
+          equipos = JSON.parse(equiposGuardados);
+        }
+        renderizarTabla();
+      };
+
+      // Guardar un nuevo equipo
+      async function agregarEquipo(event) {
+        event.preventDefault();
+
+        const numeroSerie = document.getElementById("numero-serie").value;
+        const excelFile = document.getElementById("archivo-excel").files[0];
+        const pdfFile = document.getElementById("archivo-pdf").files[0];
+
+        if (!numeroSerie || !excelFile || !pdfFile) {
+          alert(
+            "Por favor, completa todos los campos y selecciona ambos archivos."
+          );
+          return;
+        }
+
+        try {
+          const excelBase64 = await convertirArchivoABase64(excelFile);
+          const pdfBase64 = await convertirArchivoABase64(pdfFile);
+
+          const nuevoEquipo = {
+            numeroSerie,
+            excelFile: excelBase64,
+            pdfFile: pdfBase64,
+          };
+
+          equipos.push(nuevoEquipo);
+          localStorage.setItem("equipos", JSON.stringify(equipos));
+
+          document.getElementById("numero-serie").value = "";
+          document.getElementById("archivo-excel").value = "";
+          document.getElementById("archivo-pdf").value = "";
+
+          renderizarTabla();
+        } catch (error) {
+          console.error("Error al convertir archivos a Base64:", error);
+        }
+      }
+
+      // Eliminar equipo
+      function eliminarEquipo(index) {
+        equipos.splice(index, 1);
+        localStorage.setItem("equipos", JSON.stringify(equipos));
+        renderizarTabla();
+      }
+
+      // Actualizar equipo
+      async function actualizarEquipo(index) {
+        const numeroSerieActualizado = prompt(
+          "Ingresa el nuevo número de serie:",
+          equipos[index].numeroSerie
+        );
+        if (!numeroSerieActualizado) {
+          alert("El número de serie es requerido.");
+          return;
+        }
+
+        const excelInput = document.createElement("input");
+        excelInput.type = "file";
+        excelInput.accept = ".xlsx, .xls";
+
+        excelInput.onchange = async () => {
+          const pdfInput = document.createElement("input");
+          pdfInput.type = "file";
+          pdfInput.accept = ".pdf";
+
+          pdfInput.onchange = async () => {
+            const nuevoExcelFile = excelInput.files[0]
+              ? await convertirArchivoABase64(excelInput.files[0])
+              : equipos[index].excelFile;
+
+            const nuevoPdfFile = pdfInput.files[0]
+              ? await convertirArchivoABase64(pdfInput.files[0])
+              : equipos[index].pdfFile;
+
+            equipos[index] = {
+              ...equipos[index],
+              numeroSerie: numeroSerieActualizado,
+              excelFile: nuevoExcelFile,
+              pdfFile: nuevoPdfFile,
+            };
+
+            localStorage.setItem("equipos", JSON.stringify(equipos));
+            renderizarTabla();
+          };
+
+          pdfInput.click();
+        };
+
+        excelInput.click();
+      }
+
+      // Renderizar la tabla de equipos
+      function renderizarTabla() {
+        const tabla = document.getElementById("tabla-equipos");
+        tabla.innerHTML = "";
+
+        equipos.forEach((equipo, index) => {
+          const fila = document.createElement("tr");
+
+          fila.innerHTML = `
+                    <td class="border px-4 py-2">${equipo.numeroSerie}</td>
+                    <td class="border px-4 py-2"><a href="${equipo.excelFile}" download="Equipo_${equipo.numeroSerie}.xlsx" class="text-blue-500 hover:underline">Descargar Excel</a></td>
+                    <td class="border px-4 py-2"><a href="${equipo.pdfFile}" download="Equipo_${equipo.numeroSerie}.pdf" class="text-blue-500 hover:underline">Descargar PDF</a></td>
+                    <td class="border px-4 py-2">
+                        <button onclick="actualizarEquipo(${index})" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">Actualizar</button>
+                        <button onclick="eliminarEquipo(${index})" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 ml-2">Eliminar</button>
+                    </td>
+                `;
+
+          tabla.appendChild(fila);
+        });
+      }
+    </script>
   </head>
-  <body class="min-h-screen bg-gray-100 text-black">
-    <nav class="bg-blue-600 text-white p-4 flex justify-between items-center">
-      <div class="font-bold text-lg">EYMSA</div>
-      <div class="flex items-center space-x-2">
-        <input
-          type="text"
-          id="search-input"
-          placeholder="Buscar..."
-          class="px-4 py-2 rounded-md text-black"
-        />
-        <button
-          id="search-button"
-          class="bg-blue-700 px-4 py-2 rounded-md hover:bg-blue-800"
-        >
-          Buscar
-        </button>
-      </div>
+  <body class="bg-gray-100 text-black">
+    <nav class="bg-blue-600 text-white p-4">
+      <h1 class="text-lg font-bold">Gestión de Equipos</h1>
     </nav>
 
     <form
-      id="add-equipment-form"
-      class="bg-white p-6 mt-4 shadow-md rounded-md"
+      id="formulario-agregar"
+      class="bg-white p-6 mt-4 shadow-md rounded"
+      onsubmit="agregarEquipo(event)"
     >
       <div class="mb-4">
-        <label class="block text-black">Número de Serie:</label>
+        <label for="numero-serie" class="block text-black"
+          >Número de Serie:</label
+        >
         <input
           type="text"
-          id="serial-number-input"
-          class="w-full px-4 py-2 border rounded-md text-black"
+          id="numero-serie"
+          class="w-full px-4 py-2 border rounded"
           required
         />
       </div>
       <div class="mb-4">
-        <label class="block text-black">Subir archivo Excel:</label>
+        <label for="archivo-excel" class="block text-black"
+          >Subir archivo Excel:</label
+        >
         <input
           type="file"
-          id="excel-file-input"
+          id="archivo-excel"
           accept=".xlsx, .xls"
           class="w-full"
           required
         />
       </div>
       <div class="mb-4">
-        <label class="block text-black">Subir archivo PDF:</label>
+        <label for="archivo-pdf" class="block text-black"
+          >Subir archivo PDF:</label
+        >
         <input
           type="file"
-          id="pdf-file-input"
+          id="archivo-pdf"
           accept=".pdf"
           class="w-full"
           required
@@ -64,13 +192,13 @@
       </div>
       <button
         type="submit"
-        class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+        class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
       >
         Guardar
       </button>
     </form>
 
-    <table class="table-auto w-full mt-6 bg-white shadow-md rounded-md">
+    <table class="table-auto w-full mt-6 bg-white shadow-md rounded">
       <thead>
         <tr class="bg-blue-600 text-white">
           <th class="px-4 py-2">Número de Serie</th>
@@ -79,115 +207,7 @@
           <th class="px-4 py-2">Acciones</th>
         </tr>
       </thead>
-      <tbody id="equipment-table-body"></tbody>
+      <tbody id="tabla-equipos"></tbody>
     </table>
-
-    <script>
-      const equipmentForm = document.getElementById("add-equipment-form");
-      const serialNumberInput = document.getElementById("serial-number-input");
-      const excelFileInput = document.getElementById("excel-file-input");
-      const pdfFileInput = document.getElementById("pdf-file-input");
-      const equipmentTableBody = document.getElementById(
-        "equipment-table-body"
-      );
-      const searchInput = document.getElementById("search-input");
-
-      let equipments = JSON.parse(localStorage.getItem("equipments")) || [];
-
-      const renderTable = (filter = "") => {
-        equipmentTableBody.innerHTML = "";
-        const filteredEquipments = equipments.filter((e) =>
-          e.serialNumber.toLowerCase().includes(filter.toLowerCase())
-        );
-
-        filteredEquipments.forEach((equipment, index) => {
-          const row = document.createElement("tr");
-          row.classList.add("border-t");
-
-          row.innerHTML = `
-          <td class="px-4 py-2">${equipment.serialNumber}</td>
-          <td class="px-4 py-2">
-            <a href="${equipment.excelFile}" download="Equipo_${equipment.serialNumber}.xlsx" class="text-blue-500 hover:underline">Descargar Excel</a>
-          </td>
-          <td class="px-4 py-2">
-            <a href="${equipment.pdfFile}" download="Equipo_${equipment.serialNumber}.pdf" class="text-blue-500 hover:underline">Descargar PDF</a>
-          </td>
-          <td class="px-4 py-2">
-            <button class="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600" onclick="updateEquipment(${index})">Actualizar</button>
-            <button class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 ml-2" onclick="deleteEquipment(${index})">Eliminar</button>
-          </td>
-        `;
-
-          equipmentTableBody.appendChild(row);
-        });
-      };
-
-      const convertFileToBase64 = (file) => {
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-      };
-
-      equipmentForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const serialNumber = serialNumberInput.value;
-        const excelFile = excelFileInput.files[0];
-        const pdfFile = pdfFileInput.files[0];
-
-        if (!serialNumber || !excelFile || !pdfFile) {
-          alert(
-            "Por favor, completa todos los campos y selecciona ambos archivos."
-          );
-          return;
-        }
-
-        try {
-          const excelBase64 = await convertFileToBase64(excelFile);
-          const pdfBase64 = await convertFileToBase64(pdfFile);
-
-          equipments.push({
-            serialNumber,
-            excelFile: excelBase64,
-            pdfFile: pdfBase64,
-          });
-
-          localStorage.setItem("equipments", JSON.stringify(equipments));
-          serialNumberInput.value = "";
-          excelFileInput.value = "";
-          pdfFileInput.value = "";
-
-          renderTable();
-        } catch (error) {
-          console.error("Error al convertir archivos a Base64:", error);
-        }
-      });
-
-      const deleteEquipment = (index) => {
-        equipments.splice(index, 1);
-        localStorage.setItem("equipments", JSON.stringify(equipments));
-        renderTable();
-      };
-
-      const updateEquipment = (index) => {
-        const newSerialNumber = prompt(
-          "Ingresa el nuevo número de serie:",
-          equipments[index].serialNumber
-        );
-        if (!newSerialNumber) return;
-
-        equipments[index].serialNumber = newSerialNumber;
-        localStorage.setItem("equipments", JSON.stringify(equipments));
-        renderTable();
-      };
-
-      searchInput.addEventListener("input", () => {
-        renderTable(searchInput.value);
-      });
-
-      renderTable();
-    </script>
   </body>
 </html>
